@@ -3,10 +3,50 @@
 mod app;
 pub use app::SteamDilemmaApp;
 
+use rusqlite::Connection;
+use steam_rs::steam_apps::get_app_list;
+use steam_rs::{Steam, steam_id::SteamId};
+
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
-fn main() -> eframe::Result {
+#[tokio::main]
+async fn main() -> eframe::Result {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+
+    // sqlite test
+    {
+        // let connection = Connection::open_in_memory().unwrap();
+    }
+
+    // Steam test
+    {
+        let steam_api_key = &std::env::var("STEAM_API_KEY").expect("Missing an API key");
+        let steam = Steam::new(steam_api_key);
+
+        // https://tradeit.gg/steam-id-finder
+        let steam_id = SteamId::new(76561199101214612); // krupitskas TODO: figure out how to get SteamID from text
+
+        let all_user_played_games = steam
+            .get_owned_games(steam_id, true, true, 0, true, None, "english", true)
+            .await
+            .unwrap();
+
+        for game in all_user_played_games.games {
+            println!(
+                "id {} name {}",
+                game.appid,
+                game.name.unwrap_or("unknown".to_string())
+            );
+        }
+
+        println!("global games");
+
+        let all_games = Steam::get_app_list().await.unwrap();
+
+        for game in all_games.apps {
+            println!("id {} name {}", game.appid, game.name);
+        }
+    }
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -19,8 +59,9 @@ fn main() -> eframe::Result {
             ),
         ..Default::default()
     };
+
     eframe::run_native(
-        "Steam Dilmea",
+        "Steam Dilemma",
         native_options,
         Box::new(|cc| Ok(Box::new(SteamDilemmaApp::new(cc)))),
     )
