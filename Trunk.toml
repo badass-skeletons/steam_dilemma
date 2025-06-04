@@ -1,2 +1,57 @@
+trunk-version = "*"
+
 [build]
+target = "index.html"
+release = true
+dist = "dist"
+public_url = "/"
 filehash = false
+inject_scripts = true
+offline = false
+frozen = false
+locked = false
+minify = "never"
+no_sri = false
+create_nonce = false
+
+[watch]
+watch = []
+ignore = []
+
+[serve]
+addresses = ["127.0.0.1"]
+port = 8080
+disable_address_lookup = false
+# Open a browser tab once the initial build is complete.
+open = false
+# Whether to disable fallback to index.html for missing files.
+no_spa = false
+# Disable auto-reload of the web app.
+no_autoreload = false
+# Disable error reporting
+no_error_reporting = false
+# Additional headers set for responses.
+# headers = { "test-header" = "header value", "test-header2" = "header value 2" }
+# Protocol used for autoreload WebSockets connection.
+ws_protocol = "ws"
+# The certificate/private key pair to use for TLS, which is enabled if both are set.
+# tls_key_path = "self_signed_certs/key.pem"
+# tls_cert_path = "self_signed_certs/cert.pem"
+# Additional headers to send. NOTE: header names must be valid HTTP headers.
+# headers = { "X-Foo" = "bar" }
+
+[clean]
+# The output dir for all final assets.
+dist = "dist"
+# Optionally perform a cargo clean.
+cargo = false
+
+[tools]
+# Default dart-sass version to download.
+sass = "1.69.5"
+# Default wasm-bindgen version to download.
+wasm_bindgen = "0.2.89"
+# Default wasm-opt version to download.
+wasm_opt = "version_123"
+# Default tailwindcss-cli version to download.
+tailwindcss = "3.3.5"

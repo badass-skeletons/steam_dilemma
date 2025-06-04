@@ -2,6 +2,7 @@
 
 # trunk output folder
 dist
+client/dist
 
 # Rust compile target directories:
 target
@@ -10,3 +11,5 @@ target_wasm
 
 # https://github.com/lycheeverse/lychee
 .lycheecache
+
+*.db

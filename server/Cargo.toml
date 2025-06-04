@@ -1,0 +1,13 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+library = { path = "../library" }
+reqwest = "0.12.19"
+rusqlite = { version = "0.36.0", features = ["bundled"] }
+log = "0.4.27"
+serde = { version = "1.0.219", features = ["derive"] }
+env_logger = "0.11.8"
+tokio = { version = "1.45.1", features = ["full"] }
