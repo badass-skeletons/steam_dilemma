@@ -13,7 +13,7 @@ impl Default for SteamDilemmaUi {
     fn default() -> Self {
         Self {
             // Example stuff:
-            label: "Hello Andrey!".to_owned(),
+            label: "Hello Andrey v2!".to_owned(),
             value: 2.1,
         }
     }

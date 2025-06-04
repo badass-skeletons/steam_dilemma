@@ -12,13 +12,13 @@ on:
 #       - published
 
 permissions:
-  contents: write # for committing to gh-pages branch.
+  contents: write
 
 jobs:
   build-github-pages:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # repo checkout
+      - uses: actions/checkout@v4
       - name: Setup toolchain for wasm
         run: |
           rustup update stable
@@ -26,6 +26,8 @@ jobs:
           rustup set profile minimal
           rustup target add wasm32-unknown-unknown
           cargo install --locked trunk
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
       - name: Build # build
         # Environment $public_url resolves to the github project page.
         # If using a user/organization page, remove the `${{ github.event.repository.name }}` part.
