@@ -1,7 +1,4 @@
-use axum::{
-    routing::get,
-    Router,
-};
+use axum::{Router, routing::get};
 use std::net::SocketAddr;
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -27,10 +24,10 @@ async fn main() {
     // Start the server
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    
+
     println!("🚀 Server running on http://127.0.0.1:3000");
     tracing::info!("listening on {}", listener.local_addr().unwrap());
-    
+
     axum::serve(listener, app.layer(TraceLayer::new_for_http()))
         .await
         .unwrap();
@@ -39,8 +36,8 @@ async fn main() {
 fn create_router() -> Router {
     // Create a service to serve static files from the client/dist directory
     // with fallback to index.html for SPA routing
-    let serve_dir = ServeDir::new("client/dist")
-        .not_found_service(ServeFile::new("client/dist/index.html"));
+    let serve_dir =
+        ServeDir::new("client/dist").not_found_service(ServeFile::new("client/dist/index.html"));
 
     Router::new()
         // API routes can be added here in the future

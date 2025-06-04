@@ -9,7 +9,7 @@ use tokio::time::sleep;
 async fn main() -> Result<()> {
     println!("{}", "🚀 Steam Dilemma Builder".cyan().bold());
     println!("{}", "═".repeat(50).cyan());
-    
+
     // Check if trunk is installed
     if !check_trunk_installed() {
         eprintln!("{}", "❌ Trunk is not installed!".red().bold());
@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
     }
 
     println!("{}", "🔨 Building WASM client...".green().bold());
-    
+
     // Build the WASM client using trunk
     let trunk_status = Command::new("trunk")
         .args(["build", "--release"])
@@ -31,14 +31,20 @@ async fn main() -> Result<()> {
     }
 
     println!("{}", "✅ Client build successful!".green().bold());
-    
+
     // Run the server
     println!("{}", "🚀 Starting server...".blue().bold());
-    println!("   Server will be available at: {}", "http://127.0.0.1:3000".underline().cyan());
-    println!("   Health endpoint: {}", "http://127.0.0.1:3000/api/health".underline().cyan());
+    println!(
+        "   Server will be available at: {}",
+        "http://127.0.0.1:3000".underline().cyan()
+    );
+    println!(
+        "   Health endpoint: {}",
+        "http://127.0.0.1:3000/api/health".underline().cyan()
+    );
     println!("   Press {} to stop the server", "Ctrl+C".yellow().bold());
     println!();
-    
+
     let mut server_cmd = TokioCommand::new("cargo")
         .args(["run", "--bin", "server"])
         .spawn()
@@ -46,7 +52,7 @@ async fn main() -> Result<()> {
 
     // Wait a moment and check if server started successfully
     sleep(Duration::from_secs(2)).await;
-    
+
     if let Ok(Some(exit_status)) = server_cmd.try_wait() {
         eprintln!("{}", "❌ Server failed to start!".red().bold());
         eprintln!("   Exit status: {}", exit_status);
@@ -57,7 +63,7 @@ async fn main() -> Result<()> {
 
     // Wait for the server to finish (it runs indefinitely)
     let _status = server_cmd.wait().await?;
-    
+
     Ok(())
 }
 
@@ -67,4 +73,4 @@ fn check_trunk_installed() -> bool {
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
-} 
+}
