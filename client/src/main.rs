@@ -1,40 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod app_model;
 mod app_ui;
-mod consultant;
-mod customer;
-mod game;
-mod steam_database;
 
 pub use app_ui::SteamDilemmaUi;
 
-#[cfg(not(target_arch = "wasm32"))]
-#[tokio::main]
-async fn main() -> eframe::Result {
-    env_logger::init();
-
-    let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([400.0, 300.0])
-            .with_min_inner_size([300.0, 220.0])
-            .with_icon(
-                eframe::icon_data::from_png_bytes(&include_bytes!("../assets/icon-256.png")[..])
-                    .expect("Failed to load icon"),
-            ),
-        ..Default::default()
-    };
-
-    eframe::run_native(
-        "Steam Dilemma",
-        native_options,
-        Box::new(|cc| Ok(Box::new(SteamDilemmaUi::new(cc)))),
-    )
-}
-
 #[cfg(target_arch = "wasm32")]
 fn main() {
-    use eframe::wasm_bindgen::JsCast as _;
+    use wasm_bindgen::JsCast;
 
     // Redirect `log` message to `console.log` and friends:
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
@@ -76,4 +48,9 @@ fn main() {
             }
         }
     });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn main() {
+    panic!("This application is designed to run in WASM only. Use 'trunk build' to build for web.");
 }
