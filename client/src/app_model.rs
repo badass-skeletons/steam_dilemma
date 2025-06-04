@@ -6,7 +6,4 @@ pub struct AppModel {
     pub game_library: SteamGameLibrary,
 }
 
-impl AppModel {
-
-
-}
+impl AppModel {}

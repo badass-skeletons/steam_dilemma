@@ -1,11 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod app_ui;
 mod app_model;
-mod customer;
+mod app_ui;
 mod consultant;
-mod steam_database;
+mod customer;
 mod game;
+mod steam_database;
 
 pub use app_ui::SteamDilemmaUi;
 

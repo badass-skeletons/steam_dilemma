@@ -1,4 +1,3 @@
-use library;
 use rusqlite::{Connection, Result};
 
 fn table_exists(conn: &Connection, table_name: &str) -> Result<bool> {
