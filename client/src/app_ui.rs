@@ -1,4 +1,4 @@
-use library::{Consultant, CounterResponse, Customer, Room};
+use library::{Consultant, CounterResponse, Customer, NewCustomerResponse, Room};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
@@ -13,9 +13,10 @@ enum RequestState {
 #[derive(Clone, Serialize, Deserialize)]
 struct ClientState {
     pub current_room: Option<Room>,
-    pub connected_users: Vec<Customer>,
-    pub available_consultants: Vec<Consultant>,
     pub server_counter: Option<u64>,
+
+    pub steam_id_str: String,
+    pub current_customer: Option<Customer>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -27,7 +28,7 @@ pub struct SteamDilemmaUi {
     label: String,
     room_id: Option<u64>,
 
-    #[serde(skip)] 
+    #[serde(skip)]
     value: f32,
 
     #[serde(skip)] // Don't serialize HTTP client
@@ -51,6 +52,45 @@ fn parse_room_id_from_url() -> Option<u64> {
         }
     }
     None
+}
+
+async fn send_get_customer_library_request(
+    client: reqwest::Client,
+    request_state: Arc<Mutex<RequestState>>,
+    shared_client_state: Arc<Mutex<ClientState>>,
+    ctx: egui::Context,
+) {
+    let response_result = client
+        .post("http://127.0.0.1:3000/api/get_customer_library")
+        .json(&shared_client_state.lock().unwrap().steam_id_str)
+        .send()
+        .await;
+
+    handle_get_customer_library_response(response_result, request_state, shared_client_state, ctx)
+        .await;
+}
+
+async fn handle_get_customer_library_response(
+    response_result: Result<reqwest::Response, reqwest::Error>,
+    request_state: Arc<Mutex<RequestState>>,
+    shared_client_state: Arc<Mutex<ClientState>>,
+    ctx: egui::Context,
+) {
+    match response_result {
+        Ok(response) => {
+            handle_successful_custom_library_response(
+                response,
+                request_state,
+                shared_client_state,
+                ctx,
+            )
+            .await;
+        }
+        Err(e) => {
+            update_request_state_error(&request_state, format!("Request failed: {}", e));
+            ctx.request_repaint();
+        }
+    }
 }
 
 async fn send_increment_request(
@@ -79,6 +119,30 @@ async fn handle_increment_response(
         }
         Err(e) => {
             update_request_state_error(&request_state, format!("Request failed: {}", e));
+            ctx.request_repaint();
+        }
+    }
+}
+
+async fn handle_successful_custom_library_response(
+    response: reqwest::Response,
+    request_state: Arc<Mutex<RequestState>>,
+    shared_client_state: Arc<Mutex<ClientState>>,
+    ctx: egui::Context,
+) {
+    match response.json::<NewCustomerResponse>().await {
+        Ok(customer_response) => {
+            // update_request_state_success(&request_state, counter_response.counter_value);
+            // update_client_state_counter(&shared_client_state, counter_response.counter_value);
+
+            if let Ok(mut client_state) = shared_client_state.lock() {
+                client_state.current_customer = Some(customer_response.customer);
+            }
+
+            ctx.request_repaint();
+        }
+        Err(e) => {
+            update_request_state_error(&request_state, format!("Failed to parse response: {}", e));
             ctx.request_repaint();
         }
     }
@@ -143,11 +207,7 @@ fn render_room_info(ui: &mut egui::Ui, label: &mut String) {
     ui.add_space(10.0);
 }
 
-fn render_server_counter_section(
-    ui: &mut egui::Ui,
-    ctx: &egui::Context,
-    app: &mut SteamDilemmaUi,
-) {
+fn render_server_counter_section(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut SteamDilemmaUi) {
     ui.separator();
     ui.heading("Server Counter");
 
@@ -202,23 +262,41 @@ fn render_client_state_counter(ui: &mut egui::Ui, server_counter: Option<u64>) {
     }
 }
 
-fn render_demo_section(ui: &mut egui::Ui, value: &mut f32) {
+fn render_steam_section(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut SteamDilemmaUi) {
     ui.add_space(10.0);
     ui.separator();
-    
-    ui.add(egui::Slider::new(value, 0.0..=10.0).text("value"));
-    if ui.button("Increment Local").clicked() {
-        *value += 1.0;
+
+    ui.horizontal(|ui| {
+        ui.text_edit_singleline(&mut app.shared_client_state.lock().unwrap().steam_id_str);
+        if ui.button("Load Library").clicked() {
+            app.get_customer_game_library(ctx);
+        }
+    });
+
+    if let Some(current_customer) = &app.client_state.current_customer {
+        ui.vertical(|ui| {
+            ui.label("Customer Data:");
+            ui.label(&current_customer.steam_name);
+        });
+
+        ui.vertical(|ui| {
+            for game in &current_customer.games {
+                ui.horizontal(|ui| {
+                    ui.label("Game:");
+                    ui.label(&game.name);
+                });
+            }
+        });
     }
 }
 
 fn render_central_panel(ctx: &egui::Context, app: &mut SteamDilemmaUi) {
     egui::CentralPanel::default().show(ctx, |ui| {
         ui.heading("Steam Dilemma");
-        
+
         render_room_info(ui, &mut app.label);
         render_server_counter_section(ui, ctx, app);
-        render_demo_section(ui, &mut app.value);
+        render_steam_section(ui, ctx, app);
     });
 }
 
@@ -226,9 +304,9 @@ impl Default for ClientState {
     fn default() -> Self {
         Self {
             current_room: None,
-            connected_users: Vec::new(),
-            available_consultants: Vec::new(),
             server_counter: None,
+            steam_id_str: "".to_owned(),
+            current_customer: None,
         }
     }
 }
@@ -296,6 +374,24 @@ impl SteamDilemmaUi {
             // Spawn the async request
             wasm_bindgen_futures::spawn_local(async move {
                 send_increment_request(client, request_state, shared_client_state, ctx).await;
+            });
+        }
+    }
+
+    fn get_customer_game_library(&mut self, ctx: &egui::Context) {
+        if let Some(client) = &self.http_client {
+            let client = client.clone();
+            let ctx = ctx.clone();
+            let request_state = self.request_state.clone();
+            let shared_client_state = self.shared_client_state.clone();
+
+            if let Ok(mut state) = request_state.lock() {
+                *state = RequestState::Loading;
+            }
+
+            wasm_bindgen_futures::spawn_local(async move {
+                send_get_customer_library_request(client, request_state, shared_client_state, ctx)
+                    .await;
             });
         }
     }

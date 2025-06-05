@@ -1,9 +1,12 @@
 use axum::{
-    Router,
+    Json, Router,
+    extract::State,
     response::Json as ResponseJson,
     routing::{get, post},
 };
-use library::{Consultant, CounterResponse, Customer, Room, SteamGameLibrary};
+use library::{
+    Consultant, CounterResponse, Customer, Game, NewCustomerResponse, Room, SteamGameLibrary,
+};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -91,6 +94,7 @@ fn create_router(state: AppState) -> Router {
         // API routes
         .route("/api/health", get(health_check))
         .route("/api/increment", post(increment_counter))
+        .route("/api/get_customer_library", post(get_customer_game_library))
         .layer(cors) // Add CORS layer to API routes
         // Serve static files and SPA fallback
         .fallback_service(serve_dir)
@@ -101,9 +105,7 @@ async fn health_check() -> &'static str {
     "OK"
 }
 
-async fn increment_counter(
-    axum::extract::State(state): axum::extract::State<AppState>,
-) -> ResponseJson<CounterResponse> {
+async fn increment_counter(State(state): State<AppState>) -> ResponseJson<CounterResponse> {
     let new_value = {
         let mut app_model = state.app_model.write().await;
         app_model.increment_counter()
@@ -113,4 +115,38 @@ async fn increment_counter(
     ResponseJson(CounterResponse {
         counter_value: new_value,
     })
+}
+
+// async fn get_customer_game_library(
+//     axum::extract::State(state): axum::extract::State<AppState>,
+// )  {
+
+//     tracing::info!("Steam ID request: {}", steam_id_str);
+
+// }
+
+async fn get_customer_game_library(
+    State(state): State<AppState>,
+    Json(steam_id_str): Json<String>,
+) -> ResponseJson<NewCustomerResponse> {
+    tracing::info!("Steam ID request: {}", steam_id_str);
+
+    let customer = Customer {
+        steam_name: "ass".to_owned(),
+        steam_id: Some(123),
+        games: vec![
+            Game {
+                id: 1337,
+                app_id: 255,
+                name: "Gay Simulator".to_owned(),
+            },
+            Game {
+                id: 1337,
+                app_id: 255,
+                name: "Black Simulator".to_owned(),
+            },
+        ],
+    };
+
+    ResponseJson(NewCustomerResponse { customer })
 }
