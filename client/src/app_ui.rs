@@ -1,6 +1,9 @@
+use egui::{ColorImage, Image, TextureHandle};
+use image::load_from_memory;
 use library::{Consultant, CounterResponse, Customer, NewCustomerResponse, Room};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+use std::thread::spawn;
 
 #[derive(Clone)]
 enum RequestState {
@@ -10,13 +13,16 @@ enum RequestState {
     Error(String),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)] //
 struct ClientState {
     pub current_room: Option<Room>,
     pub server_counter: Option<u64>,
 
     pub steam_id_str: String,
     pub current_customer: Option<Customer>,
+
+    #[serde(skip)]
+    test_texture: Option<egui::TextureHandle>,
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -42,18 +48,37 @@ pub struct SteamDilemmaUi {
 }
 
 fn parse_room_id_from_url() -> Option<u64> {
-    let window = web_sys::window()?;
-    let location_href = window.location().href().ok()?;
-    let url = url::Url::parse(&location_href).ok()?;
+    #[cfg(target_arch = "wasm32")]
+    {
+        let window = web_sys::window()?;
+        let location_href = window.location().href().ok()?;
+        let url = url::Url::parse(&location_href).ok()?;
 
-    for (key, value) in url.query_pairs() {
-        if key == "room_id" {
-            return value.parse().ok();
+        for (key, value) in url.query_pairs() {
+            if key == "room_id" {
+                return value.parse().ok();
+            }
         }
     }
     None
 }
 
+async fn download_image(url: &str) -> Result<image::DynamicImage, Box<dyn std::error::Error>> {
+    let resp = reqwest::get(url).await?;
+    let bytes = resp.bytes().await?;
+    let img = image::load_from_memory(&bytes)?;
+    Ok(img)
+}
+
+fn image_to_color_image(img: &image::DynamicImage) -> egui::ColorImage {
+    let img = img.to_rgba8();
+    let size = [img.width() as usize, img.height() as usize];
+    let pixels = img
+        .pixels()
+        .map(|p| egui::Color32::from_rgba_unmultiplied(p[0], p[1], p[2], p[3]))
+        .collect();
+    egui::ColorImage { size, pixels }
+}
 async fn send_get_customer_library_request(
     client: reqwest::Client,
     request_state: Arc<Mutex<RequestState>>,
@@ -62,7 +87,7 @@ async fn send_get_customer_library_request(
 ) {
     let response_result = client
         .post("http://127.0.0.1:3000/api/get_customer_library")
-        .json(&shared_client_state.lock().unwrap().steam_id_str)
+        .json("76561199101214612")
         .send()
         .await;
 
@@ -136,7 +161,27 @@ async fn handle_successful_custom_library_response(
             // update_client_state_counter(&shared_client_state, counter_response.counter_value);
 
             if let Ok(mut client_state) = shared_client_state.lock() {
+                log::debug!("{:?}", customer_response.customer);
                 client_state.current_customer = Some(customer_response.customer);
+            }
+
+            let proxy_url = format!(
+                "https://corsproxy.io/?{}",
+                urlencoding::encode("https://media.steampowered.com/steamcommunity/public/images/apps/920210/568a07f03f8dba0b74c4a02f6ebb43ce5e09075c.jpg")
+            );
+
+            log::debug!("proxy_url: {}", proxy_url);
+
+            let mut new_test_texture: Option<egui::TextureHandle> = None;
+
+            let url = proxy_url;//"https://media.steampowered.com/steamcommunity/public/images/apps/920210/568a07f03f8dba0b74c4a02f6ebb43ce5e09075c.jpg";
+            if let Ok(image) = download_image(url.as_str()).await {
+                let color_image = image_to_color_image(&image);
+                new_test_texture = Some(ctx.load_texture("my_image", color_image, egui::TextureOptions::default()));
+            }
+
+            if let Ok(mut client_state) = shared_client_state.lock() {
+                client_state.test_texture = new_test_texture;
             }
 
             ctx.request_repaint();
@@ -267,7 +312,7 @@ fn render_steam_section(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut SteamD
     ui.separator();
 
     ui.horizontal(|ui| {
-        ui.text_edit_singleline(&mut app.shared_client_state.lock().unwrap().steam_id_str);
+        // ui.text_edit_singleline(&mut app.shared_client_state.lock().unwrap().steam_id_str);
         if ui.button("Load Library").clicked() {
             app.get_customer_game_library(ctx);
         }
@@ -283,6 +328,9 @@ fn render_steam_section(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut SteamD
             for game in &current_customer.games {
                 ui.horizontal(|ui| {
                     ui.label("Game:");
+                    if let Some(texture) = &app.client_state.test_texture {
+                        ui.add(Image::new(texture));
+                    }
                     ui.label(&game.name);
                 });
             }
@@ -307,6 +355,7 @@ impl Default for ClientState {
             server_counter: None,
             steam_id_str: "".to_owned(),
             current_customer: None,
+            test_texture: None,
         }
     }
 }
@@ -371,7 +420,6 @@ impl SteamDilemmaUi {
                 *state = RequestState::Loading;
             }
 
-            // Spawn the async request
             wasm_bindgen_futures::spawn_local(async move {
                 send_increment_request(client, request_state, shared_client_state, ctx).await;
             });
@@ -398,16 +446,16 @@ impl SteamDilemmaUi {
 }
 
 impl eframe::App for SteamDilemmaUi {
-    /// Called by the frame work to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
-    }
-
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.sync_client_state();
 
         render_top_panel(ctx);
         render_central_panel(ctx, self);
+    }
+
+    /// Called by the frame work to save state before shutdown.
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, self);
     }
 }

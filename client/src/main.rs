@@ -29,7 +29,10 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(SteamDilemmaUi::new(cc)))),
+                Box::new(|cc| {
+                    egui_extras::install_image_loaders(&cc.egui_ctx);
+                    Ok(Box::new(SteamDilemmaUi::new(cc)))
+                }),
             )
             .await;
 

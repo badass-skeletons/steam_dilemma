@@ -1,3 +1,5 @@
+mod steam;
+
 use axum::{
     Json, Router,
     extract::State,
@@ -18,6 +20,8 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::steam::steam_client::SteamClient;
 
 #[derive(Debug, Clone)]
 pub struct AppModel {
@@ -117,13 +121,32 @@ async fn increment_counter(State(state): State<AppState>) -> ResponseJson<Counte
     })
 }
 
-// async fn get_customer_game_library(
-//     axum::extract::State(state): axum::extract::State<AppState>,
-// )  {
+async fn get_customer_library_from_steam(steam_id: String) -> Customer {
+    let steam_client = SteamClient::from("B72EE916D1F9D8B67E1D5C55AD6436F4".to_string());
 
-//     tracing::info!("Steam ID request: {}", steam_id_str);
+    let mut customer = Customer {
+        steam_name: "ass".to_owned(),
+        steam_id: Some(123),
+        games: Vec::new(),
+    };
 
-// }
+    match steam_client.get_user_library(&steam_id).await {
+        Ok(library) => {
+            log::info!("Library received with {} games", library.game_count);
+
+            customer.games = library
+                .games
+                .into_iter()
+                .map(|raw| Game::from(raw))
+                .collect();
+        }
+        Err(error) => {
+            log::error!("Can't get steam library : {error}")
+        }
+    }
+
+    customer
+}
 
 async fn get_customer_game_library(
     State(state): State<AppState>,
@@ -131,22 +154,7 @@ async fn get_customer_game_library(
 ) -> ResponseJson<NewCustomerResponse> {
     tracing::info!("Steam ID request: {}", steam_id_str);
 
-    let customer = Customer {
-        steam_name: "ass".to_owned(),
-        steam_id: Some(123),
-        games: vec![
-            Game {
-                id: 1337,
-                app_id: 255,
-                name: "Gay Simulator".to_owned(),
-            },
-            Game {
-                id: 1337,
-                app_id: 255,
-                name: "Black Simulator".to_owned(),
-            },
-        ],
-    };
+    let customer = get_customer_library_from_steam(steam_id_str).await;
 
     ResponseJson(NewCustomerResponse { customer })
 }

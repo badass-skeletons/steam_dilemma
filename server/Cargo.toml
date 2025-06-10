@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 library = { path = "../library" }
-reqwest = "0.12.19"
+reqwest = {version = "0.12.19", features = ["blocking", "json"] }
 rusqlite = { version = "0.36.0", features = ["bundled"] }
 log = "0.4.27"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -17,3 +17,4 @@ tower = "0.5.2"
 tower-http = { version = "0.6.6", features = ["fs", "trace", "cors"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+thiserror = "2.0.7"
